@@ -118,7 +118,7 @@ func creteCollectionFromArray(arr []string) string {
 }
 
 func (c *DelobContext) sendMessage(expression string) (string, error) {
-	response, err := c.tcpHandler.sendMessage(expression)
+	response, err := c.tcpHandler.sendRequest(expression)
 	if err != nil {
 		return "", err
 	}

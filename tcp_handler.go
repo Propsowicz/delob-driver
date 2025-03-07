@@ -8,6 +8,7 @@ import (
 )
 
 type tcpHandler struct {
+	authManager      AuthenticationManager
 	connectionString connectionString
 	protocolVersion  string
 	conn             net.Conn
@@ -27,6 +28,7 @@ func newTcpHandler(rawConnectionString string) (*tcpHandler, error) {
 	}
 
 	return &tcpHandler{
+		authManager:      NewAuthenticationManager(),
 		connectionString: connectionString,
 		protocolVersion:  "00", // TODO
 		conn:             conn,
@@ -35,87 +37,67 @@ func newTcpHandler(rawConnectionString string) (*tcpHandler, error) {
 	}, nil
 }
 
-func (h *tcpHandler) sendMessage(message string) (string, error) {
-	_, err := h.writer.WriteString(message + " \n")
+func (h *tcpHandler) sendRequest(message string) (string, error) {
+	response, errRespParse := h.getResponse(message)
+	if errRespParse != nil {
+		return "", errRespParse
+	}
+
+	switch response.status {
+	case fail:
+		return response.msg, fmt.Errorf(response.msg)
+	case success:
+		return response.msg, nil
+	case authChallenge:
+
+		s_nonce, salt, iterations, errServerFirstParse, auth := h.getClientFirstMessage()
+		if errServerFirstParse != nil {
+			return "", errServerFirstParse
+		}
+
+		fmt.Println(s_nonce)
+		fmt.Println(salt)
+		fmt.Println(iterations)
+		fmt.Println(auth)
+
+		// verify proof -> re-send initial msg
+	}
+
+	return response.msg, nil
+}
+
+func (h *tcpHandler) getClientFirstMessage() (int, string, int, error, string) {
+	auth := h.authManager.addClientFirstAuthString(h.connectionString.username, generateNonce())
+
+	response, errRespParse := h.getResponse(auth)
+	if errRespParse != nil {
+		return 0, "", 0, errRespParse, ""
+	}
+
+	s_nonce, salt, iterations, errServerFirstParse := h.authManager.parseServerFirst(response.msg)
+	if errServerFirstParse != nil {
+		return 0, "", 0, errServerFirstParse, ""
+	}
+
+	return s_nonce, salt, iterations, errServerFirstParse, h.authManager.addServerFirstAuthString(auth, salt, s_nonce, iterations)
+}
+
+func (h *tcpHandler) getResponse(requestMessage string) (response, error) {
+	request := newRequest(h.connectionString.username, requestMessage)
+	_, err := h.writer.WriteString(request.toString())
 	if err != nil {
-		return "", err
+		return response{}, err
 	}
 	if err := h.writer.Flush(); err != nil {
-		return "", err
+		return response{}, err
 	}
 
-	response, err := h.reader.ReadString('\n')
+	streamResponse, err := h.reader.ReadString('\n')
 	if err != nil {
-		return "", err
+		return response{}, err
 	}
 
-	rawResponse := strings.TrimSpace(response)
-	protocolVersion := rawResponse[0:2]
-	executionState := rawResponse[2:3]
+	rawResponse := strings.TrimSpace(streamResponse)
 
-	if protocolVersion != h.protocolVersion {
-		return "", fmt.Errorf("wrong protocol version")
-	}
-	if executionState == "0" {
-		return "", fmt.Errorf("expression execution was not successful: %s", strings.TrimSpace(response)[3:])
-	}
-
-	return strings.TrimSpace(response)[3:], nil
-}
-
-type connectionString struct {
-	server   string
-	port     string
-	adress   string
-	username string
-	password string
-}
-
-func parseConnectionString(rawConnectionString string) (connectionString, error) {
-	const defaultPort string = "5678"
-	const serverKey string = "server"
-	const portKey string = "port"
-	const uidKey string = "uid"
-	const pwdKey string = "pwd"
-
-	tokens := strings.Split(rawConnectionString, ";")
-	connectionString := connectionString{}
-
-	for i := range tokens {
-		tokenKeyValue := strings.Split(tokens[i], "=")
-		switch strings.ToLower(tokenKeyValue[0]) {
-		case serverKey:
-			connectionString.server = tokenKeyValue[1]
-		case portKey:
-			connectionString.port = tokenKeyValue[1]
-		case uidKey:
-			connectionString.username = tokenKeyValue[1]
-		case pwdKey:
-			connectionString.password = tokenKeyValue[1]
-		}
-	}
-	if connectionString.port == "" {
-		connectionString.port = defaultPort
-	}
-
-	if err := validateConnectionStringElement(connectionString.server, serverKey); err != nil {
-		return connectionString, err
-	}
-	if err := validateConnectionStringElement(connectionString.username, uidKey); err != nil {
-		return connectionString, err
-	}
-	if err := validateConnectionStringElement(connectionString.password, pwdKey); err != nil {
-		return connectionString, err
-	}
-
-	connectionString.adress = connectionString.server + ":" + connectionString.port
-
-	return connectionString, nil
-}
-
-func validateConnectionStringElement(element, key string) error {
-	if element == "" {
-		return fmt.Errorf("cannot find %s element in connection string", key)
-	}
-	return nil
+	return newResponse(rawResponse)
 }
