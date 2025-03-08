@@ -1,11 +1,14 @@
 package delobdriver
 
 import (
+	"encoding/hex"
 	"fmt"
-	"math/rand"
 	"strconv"
 	"strings"
 )
+
+const clientKeySalt string = "Client Key"
+const serverKeySalt string = "Server Key"
 
 type AuthenticationManager struct {
 
@@ -81,6 +84,11 @@ func (a *AuthenticationManager) parseServerFirst(s string) (int, string, int, er
 	return 0, "", 0, fmt.Errorf("cannot parse client first message")
 }
 
-func generateNonce() int {
-	return rand.Intn(256)
+func (a *AuthenticationManager) calculateProof(password, salt, auth string, iterations int) string {
+	hashedPassword := calculateHashedPassword(password, salt, iterations)
+	clientKey := computeHmacHash(hashedPassword, []byte(clientKeySalt))
+	storedKey := computeSha256Hash(clientKey)
+	clientSignature := computeHmacHash(storedKey, []byte(auth))
+
+	return hex.EncodeToString(xorBytes(clientKey, clientSignature))
 }

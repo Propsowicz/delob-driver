@@ -50,15 +50,26 @@ func (h *tcpHandler) sendRequest(message string) (string, error) {
 		return response.msg, nil
 	case authChallenge:
 
-		s_nonce, salt, iterations, errServerFirstParse, auth := h.getClientFirstMessage()
-		if errServerFirstParse != nil {
-			return "", errServerFirstParse
+		auth := h.prepareClientFirstAuthString()
+
+		s_nonce, salt, iterations, errServerFirstRequest := h.getServerFirstMessage(auth)
+		if errServerFirstRequest != nil {
+			return "", errServerFirstRequest
 		}
 
-		fmt.Println(s_nonce)
-		fmt.Println(salt)
-		fmt.Println(iterations)
+		auth = h.prepareClientFinalAuthString(auth, salt, s_nonce, iterations)
+
+		proof := h.prepareProof(h.connectionString.password, salt, auth, iterations)
+
+		fmt.Println("proof")
 		fmt.Println(auth)
+		fmt.Println(proof)
+
+		errVerifierRequest := h.getVerifier(proof)
+		if errVerifierRequest != nil {
+			return "", errVerifierRequest
+		}
+		fmt.Println(errVerifierRequest)
 
 		// verify proof -> re-send initial msg
 	}
@@ -66,20 +77,46 @@ func (h *tcpHandler) sendRequest(message string) (string, error) {
 	return response.msg, nil
 }
 
-func (h *tcpHandler) getClientFirstMessage() (int, string, int, error, string) {
-	auth := h.authManager.addClientFirstAuthString(h.connectionString.username, generateNonce())
+func (h *tcpHandler) getVerifier(proof string) error {
+	response, errRespParse := h.getResponse(proof)
+	if errRespParse != nil {
+		return errRespParse
+	}
 
+	fmt.Println("response")
+	fmt.Println(response)
+
+	if response.status == proofVerified {
+		return nil
+	}
+
+	return fmt.Errorf("cannot authenticate user")
+}
+
+func (h *tcpHandler) prepareProof(password, salt, auth string, iterations int) string {
+	return h.authManager.calculateProof(password, salt, auth, iterations)
+}
+
+func (h *tcpHandler) prepareClientFirstAuthString() string {
+	return h.authManager.addClientFirstAuthString(h.connectionString.username, generateNonce())
+}
+
+func (h *tcpHandler) prepareClientFinalAuthString(auth, salt string, s_nonce, iterations int) string {
+	return h.authManager.addServerFirstAuthString(auth, salt, s_nonce, iterations)
+}
+
+func (h *tcpHandler) getServerFirstMessage(auth string) (int, string, int, error) {
 	response, errRespParse := h.getResponse(auth)
 	if errRespParse != nil {
-		return 0, "", 0, errRespParse, ""
+		return 0, "", 0, errRespParse
 	}
 
 	s_nonce, salt, iterations, errServerFirstParse := h.authManager.parseServerFirst(response.msg)
 	if errServerFirstParse != nil {
-		return 0, "", 0, errServerFirstParse, ""
+		return 0, "", 0, errServerFirstParse
 	}
 
-	return s_nonce, salt, iterations, errServerFirstParse, h.authManager.addServerFirstAuthString(auth, salt, s_nonce, iterations)
+	return s_nonce, salt, iterations, errServerFirstParse
 }
 
 func (h *tcpHandler) getResponse(requestMessage string) (response, error) {
