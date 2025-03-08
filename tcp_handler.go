@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+const requestLimit int8 = 5
+
 type tcpHandler struct {
 	authManager      AuthenticationManager
 	connectionString connectionString
@@ -37,7 +39,11 @@ func newTcpHandler(rawConnectionString string) (*tcpHandler, error) {
 	}, nil
 }
 
-func (h *tcpHandler) sendRequest(message string) (string, error) {
+func (h *tcpHandler) sendRequest(message string, requestCounter int8) (string, error) {
+	if requestCounter > requestLimit {
+		return "", fmt.Errorf("connection limit has been exceeded.")
+	}
+
 	response, errRespParse := h.getResponse(message)
 	if errRespParse != nil {
 		return "", errRespParse
@@ -61,17 +67,12 @@ func (h *tcpHandler) sendRequest(message string) (string, error) {
 
 		proof := h.prepareProof(h.connectionString.password, salt, auth, iterations)
 
-		fmt.Println("proof")
-		fmt.Println(auth)
-		fmt.Println(proof)
-
 		errVerifierRequest := h.getVerifier(proof)
 		if errVerifierRequest != nil {
 			return "", errVerifierRequest
 		}
-		fmt.Println(errVerifierRequest)
 
-		// verify proof -> re-send initial msg
+		return h.sendRequest(message, requestCounter+1)
 	}
 
 	return response.msg, nil
@@ -82,9 +83,6 @@ func (h *tcpHandler) getVerifier(proof string) error {
 	if errRespParse != nil {
 		return errRespParse
 	}
-
-	fmt.Println("response")
-	fmt.Println(response)
 
 	if response.status == proofVerified {
 		return nil
@@ -109,6 +107,10 @@ func (h *tcpHandler) getServerFirstMessage(auth string) (int, string, int, error
 	response, errRespParse := h.getResponse(auth)
 	if errRespParse != nil {
 		return 0, "", 0, errRespParse
+	}
+
+	if response.status == fail {
+		return 0, "", 0, fmt.Errorf(response.msg)
 	}
 
 	s_nonce, salt, iterations, errServerFirstParse := h.authManager.parseServerFirst(response.msg)

@@ -30,7 +30,7 @@ func xorBytes(k, j []byte) []byte {
 	return result
 }
 
-func calculateHashedPassword(password, salt string, iterations int) []byte {
+func calculateHashedPassword(password string, salt []byte, iterations int) []byte {
 	const keyLength int = 32
 
 	hashedPassword := pbkdf2.Key([]byte(password), []byte(salt), iterations, keyLength, sha256.New)

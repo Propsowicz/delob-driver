@@ -85,9 +85,14 @@ func (a *AuthenticationManager) parseServerFirst(s string) (int, string, int, er
 }
 
 func (a *AuthenticationManager) calculateProof(password, salt, auth string, iterations int) string {
-	hashedPassword := calculateHashedPassword(password, salt, iterations)
+	saltByte, err := hex.DecodeString(salt)
+	if err != nil {
+		panic(err.Error())
+	}
+	hashedPassword := calculateHashedPassword(password, saltByte, iterations)
 	clientKey := computeHmacHash(hashedPassword, []byte(clientKeySalt))
 	storedKey := computeSha256Hash(clientKey)
+
 	clientSignature := computeHmacHash(storedKey, []byte(auth))
 
 	return hex.EncodeToString(xorBytes(clientKey, clientSignature))
