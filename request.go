@@ -15,5 +15,5 @@ func newRequest(user, msg string) request {
 }
 
 func (r *request) toString() string {
-	return fmt.Sprintf("%s|||%s\n", r.user, r.msg)
+	return fmt.Sprintf("%s\r\n%s\n", r.user, r.msg)
 }

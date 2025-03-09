@@ -15,11 +15,11 @@ type response struct {
 type status int8
 
 const (
-	fail             status = 0
-	success          status = 1
-	proofVerified    status = 7
-	proofNotVerified status = 8
-	authChallenge    status = 9
+	fail                     status = 0
+	success                  status = 1
+	user_verified            status = 7
+	user_not_verified        status = 8
+	authentication_challenge status = 9
 )
 
 func parseStatus(s string) status {
@@ -34,11 +34,11 @@ func parseStatus(s string) status {
 	case 1:
 		return success
 	case 7:
-		return proofVerified
+		return user_verified
 	case 8:
-		return proofNotVerified
+		return user_not_verified
 	case 9:
-		return authChallenge
+		return authentication_challenge
 
 	default:
 		return fail

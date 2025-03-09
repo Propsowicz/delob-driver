@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 )
 
 const requestLimit int8 = 5
@@ -41,7 +42,11 @@ func newTcpHandler(rawConnectionString string) (*tcpHandler, error) {
 
 func (h *tcpHandler) sendRequest(message string, requestCounter int8) (string, error) {
 	if requestCounter > requestLimit {
-		return "", fmt.Errorf("connection limit has been exceeded.")
+		return "", fmt.Errorf("connections limit has been exceeded.")
+	}
+
+	if requestCounter > 0 {
+		time.Sleep(50 * time.Millisecond * time.Duration(requestCounter))
 	}
 
 	response, errRespParse := h.getResponse(message)
@@ -54,7 +59,7 @@ func (h *tcpHandler) sendRequest(message string, requestCounter int8) (string, e
 		return response.msg, fmt.Errorf(response.msg)
 	case success:
 		return response.msg, nil
-	case authChallenge:
+	case authentication_challenge:
 		auth := h.prepareClientFirstAuthString()
 
 		s_nonce, salt, iterations, errServerFirstRequest := h.getServerFirstMessage(auth)
@@ -83,7 +88,7 @@ func (h *tcpHandler) getVerifier(proof string) error {
 		return errRespParse
 	}
 
-	if response.status == proofVerified {
+	if response.status == user_verified {
 		return nil
 	}
 
