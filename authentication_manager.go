@@ -11,31 +11,11 @@ const clientKeySalt string = "Client Key"
 const serverKeySalt string = "Server Key"
 
 type AuthenticationManager struct {
-
-	// handshake client <-> data base SCRAM (password)
-	// tcp client <-> data base
-	//
-	// 1. Handshake
-	// 2. userData persistance
-	// 3. session storage
-
 }
 
 func NewAuthenticationManager() AuthenticationManager {
 	return AuthenticationManager{}
 }
-
-// 0-1 failure/success
-// server responses:
-// 9 - not auth -> challenge me!
-// 8 - here is challenge data
-// 6/7 forbidden/access
-// client --> server
-// server -> data (salt, random number) -> client
-// client -> generate hash -> server
-// server generate hash -> compare hashes
-// ok -> 7 & save session
-// not OK -> forbid - 6
 
 func (a *AuthenticationManager) addServerFirstAuthString(auth, salt string, s_nonce, iterations int) string {
 	auth = a.addToAuth(auth, fmt.Sprintf("s_nonce=%d,", s_nonce))

@@ -55,7 +55,6 @@ func (h *tcpHandler) sendRequest(message string, requestCounter int8) (string, e
 	case success:
 		return response.msg, nil
 	case authChallenge:
-
 		auth := h.prepareClientFirstAuthString()
 
 		s_nonce, salt, iterations, errServerFirstRequest := h.getServerFirstMessage(auth)
