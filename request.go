@@ -15,5 +15,7 @@ func newRequest(user, msg string) request {
 }
 
 func (r *request) toString() string {
-	return fmt.Sprintf("%s\r\n%s\n", r.user, r.msg)
+	const uniqueDelimiter string = "\x1E\x1F"
+
+	return fmt.Sprintf("%s%s%s\n", r.user, uniqueDelimiter, r.msg)
 }
