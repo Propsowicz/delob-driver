@@ -40,6 +40,10 @@ func NewContext(connectionString string) (DelobContext, error) {
 	}, nil
 }
 
+func (c *DelobContext) Close() {
+	c.tcpHandler.conn.Close()
+}
+
 func (c *DelobContext) AddPlayer(playerKey string) error {
 	expression := fmt.Sprintf("ADD PLAYER '%s';", playerKey)
 
