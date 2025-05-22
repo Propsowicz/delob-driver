@@ -1,7 +1,6 @@
 package delobdriver
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -9,25 +8,6 @@ import (
 type DelobContext struct {
 	tcpHandler *tcpHandler
 }
-
-type Player struct {
-	Key string
-	Elo int
-}
-
-type OrderKey string
-
-const (
-	Key OrderKey = "Key"
-	Elo OrderKey = "Elo"
-)
-
-type OrderDirection string
-
-const (
-	Ascending  OrderDirection = "ASC"
-	Descending OrderDirection = "DESC"
-)
 
 func NewContext(connectionString string) (DelobContext, error) {
 	tcpHandler, err := newTcpHandler(connectionString)
@@ -84,32 +64,6 @@ func (c *DelobContext) SetDrawMatch(playerOneKey, playerTwoKey string) error {
 
 	_, result := c.sendMessage(expression)
 	return result
-}
-
-func (c *DelobContext) GetPlayers() ([]Player, error) {
-	expression := "SELECT Players;"
-
-	return c.getPlayersQuery(expression)
-}
-
-func (c *DelobContext) GetPlayersOrderBy(orderKey OrderKey, orderDirection OrderDirection) ([]Player, error) {
-	expression := fmt.Sprintf("SELECT Players ORDER BY %s %s;", orderKey, orderDirection)
-
-	return c.getPlayersQuery(expression)
-}
-
-func (c *DelobContext) getPlayersQuery(expression string) ([]Player, error) {
-	jsonResponse, errDelob := c.sendMessage(expression)
-	if errDelob != nil {
-		return nil, errDelob
-	}
-
-	result := []Player{}
-	err := json.Unmarshal([]byte(jsonResponse), &result)
-	if err != nil {
-		return nil, err
-	}
-	return result, nil
 }
 
 func creteCollectionFromArray(arr []string) string {
